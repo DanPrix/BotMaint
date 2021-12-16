@@ -1,13 +1,14 @@
 from PyQt5.QtWidgets import (QApplication, QWidget,
-                             QLineEdit, QLabel,
-                             QPushButton, QHBoxLayout,
-                             QTabWidget, QAbstractScrollArea,
+                             QPushButton, QTabWidget, QAbstractScrollArea,
                              QTableWidgetItem, QMessageBox,
                              QVBoxLayout, QHBoxLayout,
-                             QTableWidget, QGroupBox)
+                             QTableWidget, QGroupBox, QStyledItemDelegate)
 import sys
 import psycopg2
 
+class ReadOnlyDelegate(QStyledItemDelegate):
+    def createEditor(self, parent, option, index):
+        return
 
 class Window(QWidget):
     def __init__(self):
@@ -69,11 +70,55 @@ class Window(QWidget):
         self.CreateThursdayTable()
         self.CreateFridayTable()
 
-        self.UpdateSheduleButton = QPushButton("Update")
-        self.shboxU.addWidget(self.UpdateSheduleButton)
-        self.UpdateSheduleButton.clicked.connect(self.UpdateShedule)
+        self.updateSheduleButton = QPushButton("Update")
+        self.shboxU.addWidget(self.updateSheduleButton)
+        self.updateSheduleButton.clicked.connect(self.UpdateShedule)
 
         self.SheduleTab.setLayout(self.svbox)
+
+        self.SubjectTab = QWidget()
+        self.tabs.addTab(self.SubjectTab, "Предметы")
+
+        self.SubGbox = QGroupBox("")
+
+        self.svboxSub = QVBoxLayout()
+        self.shboxSub = QHBoxLayout()
+        self.shboxSubU = QHBoxLayout()
+
+        self.svboxSub.addLayout(self.shboxSub)
+        self.svboxSub.addLayout(self.shboxSubU)
+
+        self.shboxSub.addWidget(self.SubGbox)
+
+        self.CreateSubTable()
+
+        self.updateSubButton = QPushButton("Update")
+        self.shboxSubU.addWidget(self.updateSubButton)
+        self.updateSubButton.clicked.connect(self.UpdateSubTable)
+
+        self.SubjectTab.setLayout(self.svboxSub)
+
+        self.TeacherTab = QWidget()
+        self.tabs.addTab(self.TeacherTab, "Преподаватели")
+
+        self.TeaGbox = QGroupBox("")
+
+        self.svboxTea = QVBoxLayout()
+        self.shboxTea = QHBoxLayout()
+        self.shboxTeaU = QHBoxLayout()
+
+        self.svboxTea.addLayout(self.shboxTea)
+        self.svboxTea.addLayout(self.shboxTeaU)
+
+        self.shboxTea.addWidget(self.TeaGbox)
+
+        self.CreateTeaTable()
+
+        self.updateTeaButton = QPushButton("Update")
+        self.shboxTeaU.addWidget(self.updateTeaButton)
+        self.updateTeaButton.clicked.connect(self.UpdateTea)
+
+        self.TeacherTab.setLayout(self.svboxTea)
 
     def CreateMondayTable(self):
         self.MondayTable = QTableWidget()
@@ -111,7 +156,7 @@ class Window(QWidget):
             self.MondayTable.setCellWidget(len(records), 4, addButton)
             joinButton.clicked.connect(lambda ch, num=i: self.ChangeDayFromTable(num, 'Mon'))
             delButton.clicked.connect(lambda ch, id=records[i][0]: self.DelFromTable(id))
-            addButton.clicked.connect(lambda ch, num=i: self.AddToTable(num, 'Mon'))
+            addButton.clicked.connect(lambda ch, num=len(records): self.AddToTable(num, 'Mon'))
 
         self.MondayTable.resizeRowsToContents()
 
@@ -150,6 +195,8 @@ class Window(QWidget):
             self.TuesdayTable.setCellWidget(i, 5, delButton)
             self.TuesdayTable.setCellWidget(len(records), 4, addButton)
             joinButton.clicked.connect(lambda ch, num=i: self.ChangeDayFromTable(num, 'Tue'))
+            delButton.clicked.connect(lambda ch, id=records[i][0]: self.DelFromTable(id))
+            addButton.clicked.connect(lambda ch, num=len(records): self.AddToTable(num, 'Tue'))
 
         self.TuesdayTable.resizeRowsToContents()
 
@@ -188,6 +235,8 @@ class Window(QWidget):
             self.WednesdayTable.setCellWidget(i, 5, delButton)
             self.WednesdayTable.setCellWidget(len(records), 4, addButton)
             joinButton.clicked.connect(lambda ch, num=i: self.ChangeDayFromTable(num, 'Wed'))
+            delButton.clicked.connect(lambda ch, id=records[i][0]: self.DelFromTable(id))
+            addButton.clicked.connect(lambda ch, num=len(records): self.AddToTable(num, 'Wed'))
 
         self.WednesdayTable.resizeRowsToContents()
 
@@ -226,6 +275,8 @@ class Window(QWidget):
             self.ThursdayTable.setCellWidget(i, 5, delButton)
             self.ThursdayTable.setCellWidget(len(records), 4, addButton)
             joinButton.clicked.connect(lambda ch, num=i: self.ChangeDayFromTable(num, 'Thu'))
+            delButton.clicked.connect(lambda ch, id=records[i][0]: self.DelFromTable(id))
+            addButton.clicked.connect(lambda ch, num=len(records): self.AddToTable(num, 'Thu'))
 
         self.ThursdayTable.resizeRowsToContents()
 
@@ -264,19 +315,19 @@ class Window(QWidget):
             self.FridayTable.setCellWidget(i, 5, delButton)
             self.FridayTable.setCellWidget(len(records), 4, addButton)
             joinButton.clicked.connect(lambda ch, num=i: self.ChangeDayFromTable(num, 'Fri'))
+            delButton.clicked.connect(lambda ch, id=records[i][0]: self.DelFromTable(id))
+            addButton.clicked.connect(lambda ch, num=len(records): self.AddToTable(num, 'Fri'))
 
         self.FridayTable.resizeRowsToContents()
 
     def ChangeDayFromTable(self, rowNumb, day):
         row = list()
 
-        print(self.WDayChoose(day, self.MondayTable.rowCount(),1))
         for i in range(self.WDayColumnCount(day)):
             try:
                 row.append(self.WDayChoose(day, rowNumb, i)())
             except:
                 row.append(None)
-        print(self.WDayColumnCount(day))
         try:
             self.cursor.execute(f"UPDATE timetable SET subject='{str(row[0])}', pos='{str(row[1])}', "
                                 f"start='{str(row[2])}', room='{str(row[3])}' WHERE id='{str(row[6])}';")
@@ -295,7 +346,8 @@ class Window(QWidget):
         else:
             self.UpdateShedule()
 
-    def AddToTable(self, num, day):
+    def AddToTable(self, rowNumb, day):
+        row = list()
         wDay = {
             'Mon': 'Понедельник',
             'Tue': 'Вторник',
@@ -303,14 +355,19 @@ class Window(QWidget):
             'Thu': 'Четверг',
             'Fri': 'Пятница'
         }
+
+        for i in range(self.WDayColumnCount(day)):
+            try:
+                row.append(self.WDayChoose(day, rowNumb, i)())
+            except:
+                row.append(None)
+
         try:
             self.cursor.execute(f"INSERT INTO timetable(day, subject, pos, start, room) values('{wDay[day]}',"
-                                f"'{self.WDayChoose(day, num, 0)}', '{self.WDayChoose(day, num, 1)}',"
-                                f"'{self.WDayChoose(day, num, 2)}','{self.WDayChoose(day, num, 3)}',"
-                                f"'{self.WDayChoose(day, num, 4)}');")
+                                f"'{str(row[0])}', '{str(row[1])}','{str(row[2])}','{str(row[3])}');")
             self.conn.commit()
         except:
-            QMessageBox.about(self, "Error", "Error")
+            QMessageBox.about(self, "Error", "Enter fields correctly.")
         else:
             self.UpdateShedule()
 
@@ -326,6 +383,18 @@ class Window(QWidget):
         if day == 'Fri':
             return self.FridayTable.item(i, j).text
 
+    def WDaySet(self, data, day, i, j):
+        if day == 'Mon':
+            return self.MondayTable.setItem(i, j, QTableWidgetItem(str(data)))
+        if day == 'Tue':
+            return self.TuesdayTable.setItem(i, j, QTableWidgetItem(str(data)))
+        if day == 'Wed':
+            return self.WednesdayTable.setItem(i, j, QTableWidgetItem(str(data)))
+        if day == 'Thu':
+            return self.ThursdayTable.setItem(i, j, QTableWidgetItem(str(data)))
+        if day == 'Fri':
+            return self.FridayTable.setItem(i, j, QTableWidgetItem(str(data)))
+
     def WDayColumnCount(self, day):
         if day == 'Mon':
             return self.MondayTable.columnCount()
@@ -338,12 +407,209 @@ class Window(QWidget):
         if day == 'Fri':
             return self.FridayTable.columnCount()
 
+    def WDayRowCount(self, day):
+        if day == 'Mon':
+            return self.MondayTable.rowCount()
+        if day == 'Tue':
+            return self.TuesdayTable.rowCount()
+        if day == 'Wed':
+            return self.WednesdayTable.rowCount()
+        if day == 'Thu':
+            return self.ThursdayTable.rowCount()
+        if day == 'Fri':
+            return self.FridayTable.rowCount()
+
+    def ClearLastRow(self):
+        try:
+            self.MondayTable.removeRow(self.WDayRowCount('Mon')-1)
+            self.TuesdayTable.removeRow(self.WDayRowCount('Tue') - 1)
+            self.WednesdayTable.removeRow(self.WDayRowCount('Wed') - 1)
+            self.ThursdayTable.removeRow(self.WDayRowCount('Thu') - 1)
+            self.FridayTable.removeRow(self.WDayRowCount('Fri') - 1)
+        except:
+            QMessageBox.about(self, "Error", "Enter fields correctly.")
+
     def UpdateShedule(self):
+        self.ClearLastRow()
         self.UpdateMondayTable()
         self.UpdateTuesdayTable()
         self.UpdateWednesdayTable()
         self.UpdateThursdayTable()
         self.UpdateFridayTable()
+
+    def CreateSubTable(self):
+        self.SubTable = QTableWidget()
+
+        self.SubTable.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+
+        self.SubTable.setColumnCount(4)
+        self.SubTable.setHorizontalHeaderLabels(["Предмет", "", "", ""])
+        self.SubTable.setColumnHidden(3, True)
+
+        self.UpdateSubTable()
+
+        self.mvbox = QVBoxLayout()
+        self.mvbox.addWidget(self.SubTable)
+        self.SubGbox.setLayout(self.mvbox)
+
+    def UpdateSubTable(self):
+        self.cursor.execute("SELECT * FROM subject ORDER BY name;")
+        records = list(self.cursor.fetchall())
+
+        self.SubTable.setRowCount(len(records) + 1)
+
+        for i, r in enumerate(records):
+            r = list(r)
+            self.SubTable.setItem(i, 3, QTableWidgetItem(str(r[0])))
+            self.SubTable.setItem(i, 0, QTableWidgetItem(str(r[1])))
+            joinButton = QPushButton("Изменить")
+            delButton = QPushButton("Удалить")
+            addButton = QPushButton("Добавить")
+            self.SubTable.setCellWidget(i, 1, joinButton)
+            self.SubTable.setCellWidget(i, 2, delButton)
+            self.SubTable.setCellWidget(len(records), 1, addButton)
+            joinButton.clicked.connect(lambda ch, num=i: self.ChangeSubFromTable(num))
+            delButton.clicked.connect(lambda ch, id=records[i][0]: self.DelSubFromTable(id))
+            addButton.clicked.connect(lambda ch, num=len(records): self.AddSubToTable(num))
+
+        self.SubTable.resizeRowsToContents()
+
+    def ChangeSubFromTable(self, rowNumb):
+        row = list()
+
+        for i in range(self.SubTable.columnCount()):
+            try:
+                row.append(str(self.SubTable.item(rowNumb, i).text()))
+            except:
+                row.append(None)
+        try:
+            self.cursor.execute(f"UPDATE subject SET name='{str(row[0])}' WHERE id='{str(row[4])}';")
+            self.conn.commit()
+        except:
+            QMessageBox.about(self, "Error", "Enter all fields.")
+        else:
+            self.UpdateShedule()
+
+    def DelSubFromTable(self, id):
+        try:
+            self.cursor.execute(f"DELETE from subject WHERE id='{id}';")
+            self.conn.commit()
+        except:
+            QMessageBox.about(self, "Error", "Error")
+        else:
+            self.UpdateSub()
+
+    def AddSubToTable(self, rowNumb):
+        row = list()
+        print(self.SubTable.item(rowNumb, 0).text())
+        for i in range(self.SubTable.columnCount()):
+            try:
+                row.append(self.SubTable.item(rowNumb, i).text())
+            except:
+                row.append(None)
+
+        try:
+            self.cursor.execute(f"INSERT INTO subject(name, teacher) values('{str(row[0])}','unknown');")
+            self.conn.commit()
+        except:
+            QMessageBox.about(self, "Error", "Enter fields correctly.")
+        else:
+            self.UpdateSub()
+
+    def ClearSubLastRow(self):
+        try:
+            self.SubTable.removeRow(self.SubTable.columnCount()-1)
+        except:
+            QMessageBox.about(self, "Error", "Enter fields correctly.")
+
+    def UpdateSub(self):
+        self.ClearSubLastRow()
+        self.UpdateSubTable()
+
+    def CreateTeaTable(self):
+        self.TeaTable = QTableWidget()
+
+        self.TeaTable.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+
+        self.TeaTable.setColumnCount(4)
+        self.TeaTable.setHorizontalHeaderLabels(["Предмет", "Преподователь", "", "", ""])
+        self.TeaTable.setColumnHidden(3, True)
+        delegate = ReadOnlyDelegate(self)
+        self.TeaTable.setItemDelegateForColumn(0, delegate)
+
+        self.UpdateTeaTable()
+
+        self.mvbox = QVBoxLayout()
+        self.mvbox.addWidget(self.TeaTable)
+        self.TeaGbox.setLayout(self.mvbox)
+
+    def UpdateTeaTable(self):
+        self.cursor.execute("SELECT * FROM subject ORDER BY name;")
+        records = list(self.cursor.fetchall())
+
+        self.TeaTable.setRowCount(len(records))
+
+        for i, r in enumerate(records):
+            r = list(r)
+            self.TeaTable.setItem(i, 4, QTableWidgetItem(str(r[0])))
+            self.TeaTable.setItem(i, 0, QTableWidgetItem(str(r[1])))
+            self.TeaTable.setItem(i, 1, QTableWidgetItem(str(r[2])))
+            joinButton = QPushButton("Изменить")
+            self.TeaTable.setCellWidget(i, 2, joinButton)
+            joinButton.clicked.connect(lambda ch, num=i: self.ChangeTeaFromTable(num))
+        self.TeaTable.resizeRowsToContents()
+
+    def ChangeTeaFromTable(self, rowNumb):
+        row = list()
+
+        for i in range(self.TeaTable.columnCount()):
+            try:
+                row.append(str(self.TeaTable.item(rowNumb, i).text()))
+            except:
+                row.append(None)
+        try:
+            self.cursor.execute(f"UPDATE subject SET teacher='{str(row[1])}' WHERE id='{str(row[5])}';")
+            self.conn.commit()
+        except:
+            QMessageBox.about(self, "Error", "Enter all fields.")
+        else:
+            self.UpdateTea()
+
+    def DelTeaFromTable(self, id):
+        try:
+            self.cursor.execute(f"DELETE from subject WHERE id='{id}';")
+            self.conn.commit()
+        except:
+            QMessageBox.about(self, "Error", "Error")
+        else:
+            self.UpdateTea()
+
+    def AddTeaToTable(self, rowNumb):
+        row = list()
+        print(self.TeaTable.item(rowNumb, 0).text())
+        for i in range(self.TeaTable.columnCount()):
+            try:
+                row.append(self.TeaTable.item(rowNumb, i).text())
+            except:
+                row.append(None)
+
+        try:
+            self.cursor.execute(f"INSERT INTO subject(teacher) values('{str(row[1])}');")
+            self.conn.commit()
+        except:
+            QMessageBox.about(self, "Error", "Enter fields correctly.")
+        else:
+            self.UpdateTea()
+
+    def ClearTeaLastRow(self):
+        try:
+            self.TeaTable.removeRow(self.TeaTable.columnCount()-1)
+        except:
+            QMessageBox.about(self, "Error", "Enter fields correctly.")
+
+    def UpdateTea(self):
+        self.ClearTeaLastRow()
+        self.UpdateTeaTable()
 
 
 if __name__ == '__main__':
